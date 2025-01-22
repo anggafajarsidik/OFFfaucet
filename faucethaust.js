@@ -5,7 +5,7 @@ const fs = require('fs');
 const addresses = fs.readFileSync('listaddress.txt', 'utf-8').split('\n').filter(Boolean);
 
 // Base API endpoint
-const API_URL = 'https://faucet-test.haust.network/api/claim';
+const API_URL = 'https://faucet.haust.app/api/claim';
 
 // Function to claim faucet for a single address
 async function claimFaucet(address) {
