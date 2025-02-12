@@ -17,6 +17,16 @@ function getRandomProxy() {
     return proxy.startsWith('http') ? proxy : `http://${proxy}`;
 }
 
+// Function to get random User-Agent
+function getRandomUserAgent() {
+    const userAgents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/108.0.0.0 Safari/537.36"
+    ];
+    return userAgents[Math.floor(Math.random() * userAgents.length)];
+}
+
 // Function to claim faucet for a single address using a proxy
 async function claimFaucet(address) {
     const maxRetries = 5; // Maximum attempts per address
@@ -26,7 +36,7 @@ async function claimFaucet(address) {
         try {
             const proxy = getRandomProxy();
             console.log(`Using proxy: ${proxy}`);
-            
+
             const agent = proxy
                 ? {
                     proxy: {
@@ -41,23 +51,27 @@ async function claimFaucet(address) {
                 : {};
 
             console.log(`Attempting to claim for: ${address} (Attempt ${attempts + 1}/${maxRetries})`);
-            const response = await axios.post(API_URL, { address }, agent);
+            const response = await axios.post(API_URL, { address }, {
+                ...agent,
+                headers: {
+                    'User-Agent': getRandomUserAgent(),
+                    'Accept': 'application/json',
+                    'Referer': 'https://faucet.haust.app',
+                }
+            });
 
-            // Log the status message
             console.log(`Address: ${address} | Status: ${response.data.message}`);
 
-            // Check if claim was successful
             if (response.data.message && response.data.message.includes('success')) {
                 console.log(`Claim successful for ${address}!`);
-                return; // Exit function on success
+                return;
             }
         } catch (error) {
             console.error(`Address: ${address} | Error: ${error.response?.data?.message || error.message}`);
         }
 
-        // Wait for 5 seconds before retrying
-        console.log('Retrying...');
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        console.log('Rate limit hit. Waiting 30 seconds before retrying...');
+        await new Promise(resolve => setTimeout(resolve, 30000)); // Tunggu 30 detik sebelum mencoba lagi
         attempts++;
     }
 
@@ -70,9 +84,8 @@ async function main() {
     while (true) {
         for (const address of addresses) {
             await claimFaucet(address);
-            // Optional: Wait before processing the next address
-            console.log('Waiting 10 seconds before processing the next address...');
-            await new Promise(resolve => setTimeout(resolve, 10000));
+            console.log('Waiting 15 seconds before processing the next address...');
+            await new Promise(resolve => setTimeout(resolve, 15000));
         }
     }
 }
