@@ -29,7 +29,7 @@ function getRandomUserAgent() {
 
 // Function to claim faucet for a single address using a proxy
 async function claimFaucet(address) {
-    const maxRetries = 5; // Maximum attempts per address
+    const maxRetries = 2; // Ubah menjadi 2 kali percobaan
     let attempts = 0;
 
     while (attempts < maxRetries) {
