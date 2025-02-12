@@ -1,5 +1,6 @@
 const axios = require('axios');
 const fs = require('fs');
+const { HttpsProxyAgent } = require('https-proxy-agent'); // Import proxy agent
 
 // Load wallet addresses & proxies
 const addresses = fs.readFileSync('listaddress.txt', 'utf-8').split('\n').filter(Boolean);
@@ -18,18 +19,14 @@ function getRandomUserAgent() {
     return userAgents[Math.floor(Math.random() * userAgents.length)];
 }
 
-// Function to parse proxy string into axios format
-function parseProxy(proxy) {
+// Function to format proxy (ip:port:user:pass → http://user:pass@ip:port)
+function formatProxy(proxy) {
     if (!proxy) return null;
     const parts = proxy.split(':');
-    if (parts.length === 2) {
-        return { host: parts[0], port: parseInt(parts[1]) };
-    } else if (parts.length === 4) {
-        return {
-            host: parts[0],
-            port: parseInt(parts[1]),
-            auth: { username: parts[2], password: parts[3] }
-        };
+
+    if (parts.length === 4) {
+        // Convert to http://user:pass@ip:port
+        return `http://${parts[2]}:${parts[3]}@${parts[0]}:${parts[1]}`;
     }
     return null;
 }
@@ -41,12 +38,13 @@ async function claimFaucet(address, proxy) {
 
     while (attempts < maxRetries) {
         try {
-            console.log(`Attempting to claim for: ${address} (Attempt ${attempts + 1}/${maxRetries}) using proxy: ${proxy}`);
+            const formattedProxy = formatProxy(proxy);
+            console.log(`Attempting to claim for: ${address} (Attempt ${attempts + 1}/${maxRetries}) using proxy: ${formattedProxy}`);
 
-            const agent = proxy ? { proxy: parseProxy(proxy) } : {};
+            const agent = formattedProxy ? new HttpsProxyAgent(formattedProxy) : null;
 
             const response = await axios.post(API_URL, { address }, {
-                ...agent,
+                httpsAgent: agent,
                 headers: {
                     'User-Agent': getRandomUserAgent(),
                     'Accept': 'application/json',
@@ -57,36 +55,34 @@ async function claimFaucet(address, proxy) {
             console.log(`Address: ${address} | Status: ${response.data.message}`);
 
             if (response.data.message && response.data.message.includes('success')) {
-                console.log(`Claim successful for ${address}!`);
+                console.log(`✅ Claim successful for ${address}!`);
                 return;
             }
         } catch (error) {
-            console.error(`Address: ${address} | Error: ${error.response?.data?.message || error.message}`);
+            console.error(`❌ Address: ${address} | Error: ${error.response?.data?.message || error.message}`);
         }
 
-        if (attempts < maxRetries - 1) {
-            console.log('Rate limit hit. Waiting 30 seconds before retrying...');
-            await new Promise(resolve => setTimeout(resolve, 30000)); // Tunggu 30 detik sebelum mencoba lagi
-        }
-
+        console.log('⚠️ Rate limit hit. Waiting 30 seconds before retrying...');
+        await new Promise(resolve => setTimeout(resolve, 30000)); // Tunggu 30 detik sebelum mencoba lagi
         attempts++;
     }
 
-    console.log(`Failed to claim for ${address} after ${maxRetries} attempts.`);
+    console.log(`❌ Failed to claim for ${address} after ${maxRetries} attempts.`);
 }
 
 // Main function to process all addresses
 async function main() {
-    console.log('Starting auto claim script...');
+    console.log('🚀 Starting auto claim script...');
     
     while (true) {
         for (let i = 0; i < addresses.length; i++) {
             const address = addresses[i];
-            const proxy = proxies[i % proxies.length]; // Ambil proxy sesuai urutan, ulangi jika habis
+            const proxy = proxies[i % proxies.length]; // Ambil proxy berdasarkan index address
+
             await claimFaucet(address, proxy);
 
-            console.log('Waiting 15 seconds before processing the next address...');
-            await new Promise(resolve => setTimeout(resolve, 15000));
+            console.log('⏳ Waiting 10 seconds before processing the next address...');
+            await new Promise(resolve => setTimeout(resolve, 10000));
         }
     }
 }
